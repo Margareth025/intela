@@ -1,8 +1,12 @@
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { supabase } from './lib/supabase'
+import AdminLogin from './AdminLogin'
+import AdminDashboard from './AdminDashboard'
+
 import {
   Menu, X, ArrowRight, GraduationCap, Laptop,
-  Network, Code2, Wrench, Award, CheckCircle2, 
+  Network, Code2, Wrench, Award, CheckCircle2,
   Mail, Phone, MapPin, ChevronRight
 } from 'lucide-react'
 
@@ -42,7 +46,43 @@ const semesters = [
   }
 ]
 
-function Navbar() {
+const ROLES_AUTORISES = [
+  'directeur',
+  'secretaire',
+  'responsable_pedagogique'
+]
+
+async function chargerSessionAdministrative(user) {
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('full_name, active')
+    .eq('id', user.id)
+    .single()
+
+  if (profileError) throw profileError
+
+  if (!profile?.active) {
+    throw new Error('Ce compte administratif est désactivé.')
+  }
+
+  const { data: roleData, error: roleError } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .single()
+
+  if (roleError || !ROLES_AUTORISES.includes(roleData?.role)) {
+    throw new Error('Aucun rôle administratif valide n’est attribué à ce compte.')
+  }
+
+  return {
+    user,
+    profile,
+    role: roleData.role
+  }
+}
+
+function Navbar({ onAdminClick }) {
   const [open, setOpen] = useState(false)
 
   const links = [
@@ -60,26 +100,49 @@ function Navbar() {
         <span className="brand-symbol">I</span>
         <span>
           <strong>INTELA</strong>
-          <small>Centre de Formation Profesionnel</small>
+          <small>Institut Technologique de l'Artibonite</small>
         </span>
       </a>
 
-      <nav id="navigation-principale"className={open ? 'nav-links active' : 'nav-links'}>
+      <nav
+        id="navigation-principale"
+        className={open ? 'nav-links active' : 'nav-links'}
+      >
         {links.map(([label, href]) => (
           <a key={label} href={href} onClick={() => setOpen(false)}>
             {label}
           </a>
         ))}
-        <a className="nav-cta" href="#admission" onClick={() => setOpen(false)}>
+
+        <a
+          href="#espace-administratif"
+          onClick={(e) => {
+            e.preventDefault()
+            setOpen(false)
+            onAdminClick()
+          }}
+        >
+          Espace administratif
+        </a>
+
+        <a
+          className="nav-cta"
+          href="#admission"
+          onClick={() => setOpen(false)}
+        >
           Nous rejoindre <ArrowRight size={16} />
         </a>
       </nav>
 
-      <button className="menu-toggle"onClick={() => setOpen(!open)}aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'}aria-expanded={open}
-          aria-controls="navigation-principale"
->
-  {open ? <X /> : <Menu />}
-</button>
+      <button
+        className="menu-toggle"
+        onClick={() => setOpen(!open)}
+        aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'}
+        aria-expanded={open}
+        aria-controls="navigation-principale"
+      >
+        {open ? <X /> : <Menu />}
+      </button>
     </header>
   )
 }
@@ -88,22 +151,29 @@ function Hero() {
   return (
     <section className="hero" id="accueil">
       <div className="hero-content">
-        <span className="eyebrow">INSTITUT TECHNOLOGIQUE DE L'ARTIBONITE</span>
+        <span className="eyebrow">
+          INSTITUT TECHNOLOGIQUE DE L'ARTIBONITE
+        </span>
+
         <h1>
           Le savoir-faire technologique au service de <span>votre avenir.</span>
         </h1>
+
         <p>
           Développez vos compétences, maîtrisez les technologies et
           préparez votre avenir professionnel avec INTELA.
         </p>
+
         <div className="hero-actions">
           <a href="#formations" className="button-primary">
             Découvrir nos formations <ArrowRight size={18} />
           </a>
+
           <a href="#institut" className="button-outline">
             Découvrir INTELA
           </a>
         </div>
+
         <div className="hero-note">
           <CheckCircle2 size={18} />
           <span>Une formation structurée sur deux années</span>
@@ -115,6 +185,7 @@ function Hero() {
           src="https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=1000"
           alt="Étudiant travaillant sur un projet technologique"
         />
+
         <div className="hero-card">
           <GraduationCap size={27} />
           <div>
@@ -145,11 +216,13 @@ function About() {
 
         <div className="about-content">
           <h3>Bienvenue à INTELA</h3>
+
           <p>
             L'Institut Technologique de l'Artibonite est un établissement
             dédié à la formation technique et professionnelle dans le
             domaine des technologies de l'information.
           </p>
+
           <p>
             Notre ambition est de rendre une formation technologique
             de qualité accessible aux jeunes et aux professionnels
@@ -173,7 +246,11 @@ function Programs() {
     <section className="section programs" id="formations">
       <div className="section-heading centered">
         <span className="eyebrow">NOTRE OFFRE DE FORMATION</span>
-        <h2>Construisez vos compétences <span>en informatique.</span></h2>
+
+        <h2>
+          Construisez vos compétences <span>en informatique.</span>
+        </h2>
+
         <p>
           Un programme multidisciplinaire pour maîtriser les principaux
           domaines de l'informatique.
@@ -183,12 +260,19 @@ function Programs() {
       <div className="program-grid">
         {programs.map((program) => {
           const Icon = program.icon
+
           return (
             <article className="program-card" key={program.title}>
-              <div className="program-icon"><Icon size={27} /></div>
+              <div className="program-icon">
+                <Icon size={27} />
+              </div>
+
               <h3>{program.title}</h3>
               <p>{program.description}</p>
-              <a href="#parcours">En savoir plus <ArrowRight size={15} /></a>
+
+              <a href="#parcours">
+                En savoir plus <ArrowRight size={15} />
+              </a>
             </article>
           )
         })}
@@ -202,11 +286,14 @@ function AcademicPath() {
     <section className="section academic" id="parcours">
       <div className="academic-intro">
         <span className="eyebrow">VOTRE PARCOURS ACADÉMIQUE</span>
+
         <h2>Deux années pour construire votre avenir.</h2>
+
         <p>
           Une formation organisée en quatre semestres,
           combinant apprentissage théorique, pratique et projets.
         </p>
+
         <div className="academic-stats">
           <div><strong>02</strong><span>Années</span></div>
           <div><strong>04</strong><span>Semestres</span></div>
@@ -218,13 +305,16 @@ function AcademicPath() {
         {semesters.map((semester) => (
           <div className="semester" key={semester.number}>
             <span>{semester.number}</span>
+
             <div>
               <h3>{semester.title}</h3>
               <p>{semester.description}</p>
             </div>
+
             <ChevronRight />
           </div>
         ))}
+
         <div className="semester-note">
           Le cursus comprend quatre semestres répartis sur deux années.
           Le détail des matières et des unités d'enseignement sera
@@ -238,28 +328,37 @@ function AcademicPath() {
 function Equivalence() {
   return (
     <section className="section equivalence">
-      <div className="equivalence-icon"><Award size={35} /></div>
+      <div className="equivalence-icon">
+        <Award size={35} />
+      </div>
+
       <div>
         <span className="eyebrow">OUVERTURE ACADÉMIQUE</span>
+
         <h2>Et après votre diplôme INTELA ?</h2>
+
         <p>
           À la fin des deux années de formation, les étudiants qui
           satisfont aux exigences du programme reçoivent un diplôme
           délivré par INTELA.
         </p>
+
         <p>
           INTELA ambitionne de développer des partenariats avec des
           universités de Port-au-Prince afin de favoriser la reconnaissance
           des acquis et les possibilités de poursuite d'études supérieures.
         </p>
+
         <div className="equivalence-info">
           <strong>Comprendre l'équivalence universitaire</strong>
+
           <p>
             Une université peut examiner les cours suivis, les contenus
             pédagogiques, les résultats et les crédits d'un étudiant
             pour déterminer si certains acquis peuvent être reconnus
             dans son propre programme.
           </p>
+
           <small>
             La reconnaissance n'est pas automatique. Elle dépend des
             décisions et des critères de chaque université.
@@ -273,35 +372,69 @@ function Equivalence() {
 
 function Admissions() {
   const [form, setForm] = useState({
-    name: '',
+    nom: '',
+    prenom: '',
     email: '',
-    phone: '',
-    education: '',
-    message: '',
+    telephone: '',
+    commune: '',
+    niveau_etudes: '',
+    motivation: ''
   })
 
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
+  const [success, setSuccess] = useState(false)
+
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value
+    })
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    setLoading(true)
+    setMessage('')
+    setSuccess(false)
 
-    const subject = encodeURIComponent('Demande de préinscription - INTELA')
-    const body = encodeURIComponent(`
-DEMANDE DE PRÉINSCRIPTION - INTELA
+    try {
+      const { error } = await supabase
+        .from('preinscriptions')
+        .insert([{
+          nom: form.nom.trim(),
+          prenom: form.prenom.trim(),
+          email: form.email.trim(),
+          telephone: form.telephone.trim(),
+          commune: form.commune.trim() || null,
+          niveau_etudes: form.niveau_etudes,
+          motivation: form.motivation.trim() || null
+        }])
 
-Nom complet : ${form.name}
-E-mail : ${form.email}
-Téléphone : ${form.phone}
-Niveau d'études : ${form.education}
+      if (error) throw error
 
-Motivation :
-${form.message}
-    `)
+      setSuccess(true)
+      setMessage(
+        'Votre demande a bien été enregistrée. L’administration d’INTELA vous contactera.'
+      )
 
-    window.location.href =
-      `mailto:intela.info00@gmail.com?subject=${subject}&body=${body}`
+      setForm({
+        nom: '',
+        prenom: '',
+        email: '',
+        telephone: '',
+        commune: '',
+        niveau_etudes: '',
+        motivation: ''
+      })
+    } catch (error) {
+      console.error('Erreur préinscription :', error)
+      setMessage(
+        `Erreur Supabase : ${error.message || 'Erreur inconnue'}`
+      )
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -346,6 +479,7 @@ ${form.message}
           <div className="admission-information">
             <span className="eyebrow">Rejoignez-nous</span>
             <h3>Votre parcours commence par une candidature.</h3>
+
             <p>
               INTELA vous accompagne dans le développement de compétences
               techniques et professionnelles adaptées aux réalités du monde
@@ -373,8 +507,6 @@ ${form.message}
               <p>
                 L'envoi de ce formulaire constitue une demande de
                 préinscription et ne garantit pas une admission définitive.
-                Les conditions et pièces à fournir seront communiquées
-                par l'administration.
               </p>
             </div>
           </div>
@@ -388,14 +520,28 @@ ${form.message}
 
             <div className="form-grid">
               <div className="form-group">
-                <label htmlFor="name">Nom complet *</label>
+                <label htmlFor="prenom">Prénom *</label>
                 <input
-                  id="name"
-                  name="name"
-                  value={form.name}
+                  id="prenom"
+                  name="prenom"
+                  value={form.prenom}
                   onChange={handleChange}
-                  placeholder="Ex. : Marie Jean"
                   required
+                  maxLength={100}
+                  placeholder="Votre prénom"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="nom">Nom *</label>
+                <input
+                  id="nom"
+                  name="nom"
+                  value={form.nom}
+                  onChange={handleChange}
+                  required
+                  maxLength={100}
+                  placeholder="Votre nom"
                 />
               </div>
 
@@ -407,30 +553,44 @@ ${form.message}
                   type="email"
                   value={form.email}
                   onChange={handleChange}
+                  required
+                  maxLength={255}
                   placeholder="exemple@email.com"
-                  required
                 />
               </div>
 
               <div className="form-group">
-                <label htmlFor="phone">Téléphone *</label>
+                <label htmlFor="telephone">Téléphone *</label>
                 <input
-                  id="phone"
-                  name="phone"
+                  id="telephone"
+                  name="telephone"
                   type="tel"
-                  value={form.phone}
+                  value={form.telephone}
                   onChange={handleChange}
-                  placeholder="Votre numéro de téléphone"
                   required
+                  maxLength={30}
+                  placeholder="Votre numéro"
                 />
               </div>
 
               <div className="form-group">
-                <label htmlFor="education">Dernier niveau d'études *</label>
+                <label htmlFor="commune">Commune</label>
+                <input
+                  id="commune"
+                  name="commune"
+                  value={form.commune}
+                  onChange={handleChange}
+                  maxLength={120}
+                  placeholder="Ex. : Saint-Marc"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="niveau_etudes">Dernier niveau d'études *</label>
                 <select
-                  id="education"
-                  name="education"
-                  value={form.education}
+                  id="niveau_etudes"
+                  name="niveau_etudes"
+                  value={form.niveau_etudes}
                   onChange={handleChange}
                   required
                 >
@@ -445,19 +605,45 @@ ${form.message}
             </div>
 
             <div className="form-group">
-              <label htmlFor="message">Pourquoi souhaitez-vous intégrer INTELA ?</label>
+              <label htmlFor="motivation">
+                Pourquoi souhaitez-vous intégrer INTELA ?
+              </label>
               <textarea
-                id="message"
-                name="message"
+                id="motivation"
+                name="motivation"
                 rows="4"
-                value={form.message}
+                value={form.motivation}
                 onChange={handleChange}
                 placeholder="Présentez brièvement votre motivation..."
               />
             </div>
 
-            <button className="btn btn-primary form-submit" type="submit">
-              Soumettre ma préinscription <ArrowRight size={18} />
+            {message && (
+              <div
+                role="status"
+                style={{
+                  padding: 14,
+                  marginTop: 15,
+                  borderRadius: 6,
+                  background: success ? '#e8f7ed' : '#fff0f0',
+                  color: success ? '#176b35' : '#a52a2a',
+                  fontSize: 13,
+                  lineHeight: 1.6
+                }}
+              >
+                {message}
+              </div>
+            )}
+
+            <button
+              className="btn btn-primary form-submit"
+              type="submit"
+              disabled={loading}
+            >
+              {loading
+                ? 'Enregistrement en cours...'
+                : 'Soumettre ma préinscription'}
+              {!loading && <ArrowRight size={18} />}
             </button>
 
             <p className="form-note">
@@ -470,18 +656,20 @@ ${form.message}
   )
 }
 
-function Footer() {
+function Footer({ onAdminClick }) {
   return (
     <footer id="contact">
       <div className="footer-grid">
         <div>
           <a href="#accueil" className="brand footer-brand">
             <span className="brand-symbol">I</span>
+
             <span>
               <strong>INTELA</strong>
               <small>INSTITUT TECHNOLOGIQUE</small>
             </span>
           </a>
+
           <p>
             Former aujourd'hui les talents technologiques
             de demain.
@@ -494,6 +682,23 @@ function Footer() {
           <a href="#formations">Formations</a>
           <a href="#parcours">Parcours académique</a>
           <a href="#admission">Admissions</a>
+          <button
+            type="button"
+            onClick={onAdminClick}
+            style={{
+              display: 'block',
+              padding: 0,
+              marginTop: 8,
+              background: 'none',
+              border: 'none',
+              color: 'inherit',
+              font: 'inherit',
+              cursor: 'pointer',
+              textAlign: 'left'
+            }}
+          >
+            Espace administratif
+          </button>
         </div>
 
         <div>
@@ -513,9 +718,101 @@ function Footer() {
 }
 
 export default function App() {
+  const [adminOpen, setAdminOpen] = useState(false)
+  const [session, setSession] = useState(null)
+  const [sessionLoading, setSessionLoading] = useState(true)
+
+  useEffect(() => {
+    let actif = true
+
+    async function verifierSession() {
+      try {
+        const { data, error } = await supabase.auth.getSession()
+
+        if (error) throw error
+
+        if (!data.session) return
+
+        const sessionChargee = await chargerSessionAdministrative(
+          data.session.user
+        )
+
+        if (actif) {
+          setSession(sessionChargee)
+          setAdminOpen(true)
+        }
+      } catch (error) {
+        console.error('Vérification de session :', error)
+        await supabase.auth.signOut()
+      } finally {
+        if (actif) setSessionLoading(false)
+      }
+    }
+
+    verifierSession()
+
+    return () => {
+      actif = false
+    }
+  }, [])
+
+  async function handleLogin(loginData) {
+    try {
+      const sessionValidee = await chargerSessionAdministrative(
+        loginData.user
+      )
+      setSession(sessionValidee)
+      setAdminOpen(true)
+    } catch (error) {
+      await supabase.auth.signOut()
+      throw error
+    }
+  }
+
+  function handleLogout() {
+    setSession(null)
+    setAdminOpen(false)
+  }
+
+  if (sessionLoading) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'grid',
+          placeItems: 'center',
+          background: '#F5F0EB',
+          color: '#172A46',
+          fontFamily: "'DM Sans', sans-serif"
+        }}
+      >
+        Chargement...
+      </div>
+    )
+  }
+
+  if (session) {
+    return (
+      <AdminDashboard
+        session={session}
+        onLogout={handleLogout}
+      />
+    )
+  }
+
+  if (adminOpen) {
+    return (
+      <AdminLogin
+        onLogin={handleLogin}
+        onBack={() => setAdminOpen(false)}
+      />
+    )
+  }
+
   return (
     <>
-      <Navbar />
+      <Navbar onAdminClick={() => setAdminOpen(true)} />
+
       <main>
         <Hero />
         <About />
@@ -524,7 +821,8 @@ export default function App() {
         <Equivalence />
         <Admissions />
       </main>
-      <Footer />
+
+      <Footer onAdminClick={() => setAdminOpen(true)} />
     </>
   )
 }
